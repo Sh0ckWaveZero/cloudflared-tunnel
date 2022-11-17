@@ -1,13 +1,23 @@
 version: "3.8"
 
+secrets:
+  # Secrets are single-line text files where the sole content is the secret
+  # Paths in this example assume that secrets are kept in local folder called ".secrets"
+  DB_ROOT_PWD:
+    file: .secrets/db_root_pwd.txt
+  MYSQL_PWD:
+    file: .secrets/mysql_pwd.txt
+
 services:
   cloudflared:
     image: cloudflare/cloudflared:latest
+    container_name: cloudflared
     command: "tunnel --no-autoupdate"
     volumes:
       - ./cloudflared:/etc/cloudflared
     depends_on:
       - postgrest
+    restart: unless-stopped
 
   postgres:
     image: postgres:alpine
@@ -79,7 +89,7 @@ services:
       DB_MYSQL_HOST: "db"
       DB_MYSQL_PORT: 3306
       DB_MYSQL_USER: ${MYSQL_USER}
-      DB_MYSQL_PASSWORD__FILE: ${MYSQL_PWD}
+      DB_MYSQL_PASSWORD__FILE: /run/secrets/MYSQL_PWD
       DB_MYSQL_NAME: ${MYSQL_NAME}
     healthcheck:
       test: ["CMD", "/bin/check-health"]
@@ -90,6 +100,8 @@ services:
       - ./letsencrypt:/etc/letsencrypt
     networks:
       - cloudflared
+    secrets:
+      - MYSQL_PWD
     depends_on:
       - db
 
@@ -100,12 +112,15 @@ services:
     env_file:
       - .env
     environment:
-      MYSQL_ROOT_PASSWORD__FILE: ${DB_ROOT_PWD}
+      MYSQL_ROOT_PASSWORD__FILE: /run/secrets/DB_ROOT_PWD
       MYSQL_DATABASE: "npm"
       MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD__FILE: ${MYSQL_PWD}
+      MYSQL_PASSWORD__FILE: /run/secrets/MYSQL_PWD
     volumes:
       - ./data/mysql:/var/lib/mysql
+    secrets:
+      - DB_ROOT_PWD
+      - MYSQL_PWD
     networks:
       - cloudflared
 
@@ -123,8 +138,8 @@ services:
     env_file:
       - .env
     environment:
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     command: server --console-address ":19001" /data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
