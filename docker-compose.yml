@@ -131,8 +131,8 @@ services:
     networks:
       - cloudflared
     ports:
-      - 19000:9000
-      - 19001:9001
+      - 9000:9000
+      - 9090:9090
     volumes:
       - minio_storage:/data
     env_file:
@@ -140,7 +140,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    command: server --console-address ":19001" /data
+    command: server --console-address ":9090" /data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
