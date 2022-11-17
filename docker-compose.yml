@@ -62,6 +62,76 @@ services:
     networks:
       - cloudflared
 
+  app:
+    image: "jc21/nginx-proxy-manager:latest"
+    container_name: npm
+    restart: unless-stopped
+    ports:
+      # Public HTTP Port:
+      - "80:80"
+      # Public HTTPS Port:
+      - "443:443"
+      # Admin Web Port:
+      - "81:81"
+    env_file:
+      - .env
+    environment:
+      DB_MYSQL_HOST: "db"
+      DB_MYSQL_PORT: 3306
+      DB_MYSQL_USER: ${MYSQL_USER}
+      DB_MYSQL_PASSWORD__FILE: ${MYSQL_PWD}
+      DB_MYSQL_NAME: ${MYSQL_NAME}
+    healthcheck:
+      test: ["CMD", "/bin/check-health"]
+      interval: 10s
+      timeout: 3s
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+    networks:
+      - cloudflared
+    depends_on:
+      - db
+
+  db:
+    image: jc21/mariadb-aria
+    container_name: npm_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD__FILE: ${DB_ROOT_PWD}
+      MYSQL_DATABASE: "npm"
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD__FILE: ${MYSQL_PWD}
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    networks:
+      - cloudflared
+
+  minio:
+    container_name: minio
+    image: minio/minio:latest
+    restart: always
+    networks:
+      - cloudflared
+    ports:
+      - 19000:9000
+      - 19001:9001
+    volumes:
+      - minio_storage:/data
+    env_file:
+      - .env
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+    command: server --console-address ":19001" /data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
 networks:
   cloudflared:
     driver: bridge
@@ -69,3 +139,4 @@ networks:
 volumes:
   postgres-data: {}
   pgadmin-data: {}
+  minio_storage: {}
